@@ -17,6 +17,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --paper:#F6F4EF; --panel:#FFFFFF; --ink:#1C1F26; --ink-soft:#5B6472;
@@ -224,6 +226,7 @@ tbody tr:hover{background:rgba(217,131,36,.06);}
     <div class="loginHead">
       <div class="mark" id="loginMark"><span class="dot"></span><h1>SafeHSE Ops</h1></div>
       <p>Health, Safety &amp; Environment operations management</p>
+      <p id="syncBanner" style="margin:10px 0 0;font-size:12px;color:var(--ink-soft);">⏳ Connecting to shared data…</p>
     </div>
     <div class="tabRow">
       <button class="tabBtn active" id="tabStaffBtn" onclick="switchLoginTab('staff')">Staff login</button>
@@ -268,6 +271,7 @@ tbody tr:hover{background:rgba(217,131,36,.06);}
     <div id="topbar">
       <button id="hamburger" onclick="openSidebar()">☰</button>
       <div id="topTitle">Dashboard<span class="sub" id="topSub">Overview across all safety modules</span></div>
+      <span id="connBadge" class="badge b-ok" style="display:none;">● Offline — saving locally</span>
       <button class="iconBtn installTrigger" style="display:none;" onclick="triggerInstall()">⭳ Install app</button>
       <button class="iconBtn" onclick="toggleTheme()" id="themeBtn">◐ Theme</button>
     </div>
@@ -458,27 +462,97 @@ function getModule(id){ return MODULES.find(m=>m.id===id); }
 /* ========================================================================
    STORAGE
    ======================================================================== */
-const DATA_KEY='sg_ops_data_v1', SETTINGS_KEY='sg_ops_settings_v1', SESSION_KEY='sg_ops_session_v1', THEME_KEY='sg_ops_theme_v1', LOGO_KEY='sg_ops_logo_v1';
+/* ========================================================================
+   FIREBASE — shared, real-time data across every device
+   (config below is this app's own free Firebase project; the public
+   web config values are meant to be embedded in client code — access is
+   controlled by Firestore security rules, not by hiding these values)
+   ======================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCLT5ga3ea1S-tto9meLmbCmAmEy_gG8YU",
+  authDomain: "site-hse-ops.firebaseapp.com",
+  projectId: "site-hse-ops",
+  storageBucket: "site-hse-ops.firebasestorage.app",
+  messagingSenderId: "332402277526",
+  appId: "1:332402277526:web:a022b5c28fa97574ff96b7"
+};
+firebase.initializeApp(firebaseConfig);
+const fdb = firebase.firestore();
+try{ fdb.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(e){}
+
+const SESSION_KEY='sg_ops_session_v1', THEME_KEY='sg_ops_theme_v1';
 function getAppLink(){ return location.href.split('#')[0]; }
-function getLogo(){ try{ return localStorage.getItem(LOGO_KEY) || ''; }catch(e){ return ''; } }
-function setLogo(dataUrl){ try{ localStorage.setItem(LOGO_KEY, dataUrl); }catch(e){} }
-function removeLogo(){ try{ localStorage.removeItem(LOGO_KEY); }catch(e){} }
 
-function loadData(){
-  try{ return JSON.parse(localStorage.getItem(DATA_KEY)) || {}; }catch(e){ return {}; }
-}
-function saveData(d){ try{ localStorage.setItem(DATA_KEY, JSON.stringify(d)); }catch(e){ console.error(e); } }
-function getRecords(moduleId){ const d=loadData(); return d[moduleId] || []; }
-function setRecords(moduleId, arr){ const d=loadData(); d[moduleId]=arr; saveData(d); }
+// In-memory cache mirrored from Firestore in real time — every read in the
+// app goes through this cache so the rest of the code stays synchronous.
+let cloudCache = {};                 // moduleId -> array of records
+let settingsCache = { masterPasscode:'1234', logo:'' };
+let cloudSyncDone = { settings:false, modules:{} };
+let onCloudUpdate = null;            // set once the app shell is live, to re-render on incoming changes
 
-function loadSettings(){
-  try{
-    let s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
-    if(!s){ s = {masterPasscode:'1234'}; localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
-    return s;
-  }catch(e){ return {masterPasscode:'1234'}; }
+function moduleIdsForSync(){ return MODULES.filter(m=>!m.special).map(m=>m.id); }
+
+function startCloudSync(){
+  fdb.collection('meta').doc('settings').onSnapshot(function(doc){
+    settingsCache = Object.assign({masterPasscode:'1234', logo:''}, doc.exists ? doc.data() : {});
+    cloudSyncDone.settings = true;
+    afterCloudChange();
+  }, function(){ cloudSyncDone.settings = true; afterCloudChange(); });
+
+  moduleIdsForSync().forEach(function(id){
+    fdb.collection(id).onSnapshot(function(snap){
+      const arr = [];
+      snap.forEach(function(doc){ arr.push(doc.data()); });
+      cloudCache[id] = arr;
+      cloudSyncDone.modules[id] = true;
+      afterCloudChange();
+    }, function(){ cloudSyncDone.modules[id] = true; afterCloudChange(); });
+  });
 }
-function saveSettings(s){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+function initialSyncComplete(){
+  if(!cloudSyncDone.settings) return false;
+  return moduleIdsForSync().every(id=>cloudSyncDone.modules[id]);
+}
+function afterCloudChange(){
+  const banner = document.getElementById('syncBanner');
+  if(banner) banner.style.display = initialSyncComplete() ? 'none' : 'block';
+  applyLogo();
+  if(onCloudUpdate) onCloudUpdate();
+}
+
+function getRecords(moduleId){ return cloudCache[moduleId] || []; }
+function addRecord(moduleId, rec){
+  rec._id = uid(); rec._createdAt = Date.now();
+  cloudCache[moduleId] = (cloudCache[moduleId]||[]).concat([rec]);
+  fdb.collection(moduleId).doc(rec._id).set(rec).catch(function(e){ console.error(e); });
+  return rec;
+}
+function updateRecordCloud(moduleId, id, patch){
+  cloudCache[moduleId] = (cloudCache[moduleId]||[]).map(r=> r._id===id ? Object.assign({}, r, patch) : r);
+  fdb.collection(moduleId).doc(id).set(patch, {merge:true}).catch(function(e){ console.error(e); });
+}
+function deleteRecordCloud(moduleId, id){
+  cloudCache[moduleId] = (cloudCache[moduleId]||[]).filter(r=>r._id!==id);
+  fdb.collection(moduleId).doc(id).delete().catch(function(e){ console.error(e); });
+}
+function bulkSetRecordsCloud(moduleId, arr){
+  cloudCache[moduleId] = arr;
+  const batch = fdb.batch();
+  arr.forEach(function(r){ if(!r._id) r._id = uid(); batch.set(fdb.collection(moduleId).doc(r._id), r); });
+  batch.commit().catch(function(e){ console.error(e); });
+}
+
+function loadSettings(){ return settingsCache; }
+function saveSettings(s){
+  settingsCache = Object.assign({}, settingsCache, s);
+  fdb.collection('meta').doc('settings').set(s, {merge:true}).catch(function(e){ console.error(e); });
+}
+function getLogo(){ return settingsCache.logo || ''; }
+function setLogo(dataUrl){ saveSettings({logo:dataUrl}); }
+function removeLogo(){
+  settingsCache.logo = '';
+  fdb.collection('meta').doc('settings').set({logo: firebase.firestore.FieldValue.delete()}, {merge:true}).catch(function(e){ console.error(e); });
+}
 
 function getSession(){ try{ return JSON.parse(localStorage.getItem(SESSION_KEY)); }catch(e){ return null; } }
 function setSession(s){ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }
@@ -504,6 +578,7 @@ function showLoginMsg(msg, kind){
   el.textContent = msg;
 }
 function attemptStaffLogin(){
+  if(!initialSyncComplete()){ showLoginMsg('Still connecting to shared data — try again in a moment.'); return; }
   const phone = document.getElementById('staffPhone').value.trim();
   const pin = document.getElementById('staffPin').value.trim();
   if(!phone || !pin){ showLoginMsg('Enter your phone number and PIN.'); return; }
@@ -516,6 +591,7 @@ function attemptStaffLogin(){
   enterApp();
 }
 function attemptMasterLogin(){
+  if(!initialSyncComplete()){ showLoginMsg('Still connecting to shared data — try again in a moment.'); return; }
   const pass = document.getElementById('masterPass').value;
   const s = loadSettings();
   if(pass !== s.masterPasscode){ showLoginMsg('Incorrect master passcode.'); return; }
@@ -538,6 +614,12 @@ function enterApp(){
   document.getElementById('settingsBtn').style.display = currentUser.type==='master' ? 'block' : 'none';
   buildSidebar();
   navigateTo('dashboard');
+  onCloudUpdate = function(){
+    if(!document.getElementById('app').classList.contains('show')) return;
+    if(currentModuleId==='dashboard') renderDashboard();
+    else if(currentModuleId==='reports' || currentModuleId==='settings'){ /* static forms, no live refresh needed */ }
+    else if(document.getElementById('tableBody')) renderTable();
+  };
 }
 
 /* ========================================================================
@@ -618,8 +700,8 @@ function renderDashboard(){
   const overdueCorr = corr.filter(r=> r.status==='Overdue' || (r.dueDate && r.status!=='Completed' && daysBetween(todayStr(), r.dueDate) < 0)).length;
   const trainSoon = train.filter(r=> r.expiryDate && daysBetween(todayStr(), r.expiryDate) <= 30 && daysBetween(todayStr(), r.expiryDate) >= 0).length;
   const inspSoon = insp.filter(r=> r.nextInspectionDate && daysBetween(todayStr(), r.nextInspectionDate) <= 14 && daysBetween(todayStr(), r.nextInspectionDate) >= 0).length;
-  let totalRecords = 0; const data = loadData();
-  MODULES.forEach(m=>{ if(!m.special) totalRecords += (data[m.id]||[]).length; });
+  let totalRecords = 0;
+  MODULES.forEach(m=>{ if(!m.special) totalRecords += getRecords(m.id).length; });
 
   let html = '<div class="grid">';
   html += statCard(openInc, 'Open incidents / accidents', openInc>0?'danger':'ok');
@@ -636,7 +718,7 @@ function renderDashboard(){
   let all = [];
   MODULES.forEach(m=>{
     if(m.special) return;
-    (data[m.id]||[]).forEach(r=> all.push({mod:m.label, name:displayName(m,r), t:r._createdAt||0}));
+    getRecords(m.id).forEach(r=> all.push({mod:m.label, name:displayName(m,r), t:r._createdAt||0}));
   });
   all.sort((a,b)=>b.t-a.t);
   all = all.slice(0,10);
@@ -855,14 +937,11 @@ function saveModal(){
   if(missing){ return; }
   if(m.id==='checklists') rec.items = JSON.stringify(checklistDraft);
   if(m.id==='jobHazardAnalysis') rec.steps = JSON.stringify(jhaStepsDraft);
-  let rows = getRecords(m.id);
   if(modalCtx.recordId){
-    rows = rows.map(r=> r._id===modalCtx.recordId ? Object.assign({}, r, rec) : r);
+    updateRecordCloud(m.id, modalCtx.recordId, rec);
   } else {
-    rec._id = uid(); rec._createdAt = Date.now();
-    rows.push(rec);
+    addRecord(m.id, rec);
   }
-  setRecords(m.id, rows);
   closeModal();
   if(m.id==='dashboard') renderDashboard(); else renderTable();
   if(currentModuleId==='dashboard') renderDashboard();
@@ -871,8 +950,7 @@ function confirmDelete(moduleId, recordId){
   document.getElementById('confirmMsg').textContent = 'Delete this record? This cannot be undone.';
   const btn = document.getElementById('confirmDoBtn');
   btn.onclick = ()=>{
-    let rows = getRecords(moduleId).filter(r=>r._id!==recordId);
-    setRecords(moduleId, rows);
+    deleteRecordCloud(moduleId, recordId);
     closeConfirm();
     renderTable();
   };
@@ -942,7 +1020,9 @@ function exportAllExcel(){
   XLSX.writeFile(wb, 'SafeHSEOps_FullExport_'+todayStr()+'.xlsx');
 }
 function fullBackupJSON(){
-  const backup = { data: loadData(), settings: loadSettings(), exportedAt: new Date().toISOString() };
+  const data = {};
+  MODULES.forEach(m=>{ if(!m.special) data[m.id] = getRecords(m.id); });
+  const backup = { data, settings: loadSettings(), exportedAt: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -957,9 +1037,9 @@ function restoreBackupFile(input){
   reader.onload = function(e){
     try{
       const parsed = JSON.parse(e.target.result);
-      if(parsed.data) saveData(parsed.data);
+      if(parsed.data) Object.keys(parsed.data).forEach(id=> bulkSetRecordsCloud(id, parsed.data[id]||[]));
       if(parsed.settings) saveSettings(parsed.settings);
-      flashTopMsg('Backup restored successfully.');
+      flashTopMsg('Backup restored — syncing to every device now.');
       navigateTo('dashboard');
     }catch(err){ flashTopMsg('Could not read that backup file.'); }
   };
@@ -1102,14 +1182,22 @@ window.addEventListener('beforeinstallprompt', function(e){
   e.preventDefault(); deferredInstallPrompt = e;
   document.querySelectorAll('.installTrigger').forEach(b=>b.style.display='inline-flex');
 });
+function updateConnBadge(){
+  const el = document.getElementById('connBadge'); if(!el) return;
+  el.style.display = navigator.onLine ? 'none' : 'inline-block';
+  el.className = 'badge b-warn';
+}
+window.addEventListener('online', updateConnBadge);
+window.addEventListener('offline', updateConnBadge);
 
 /* ========================================================================
    INIT
    ======================================================================== */
 (function init(){
-  loadSettings();
+  startCloudSync();
   registerSW();
   applyLogo();
+  updateConnBadge();
   if(isIOS() && !window.navigator.standalone){
     document.querySelectorAll('.iosInstallHint').forEach(el=>el.style.display='block');
   }

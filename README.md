@@ -6,14 +6,38 @@ Android, iOS and desktop, and keeps working offline after the first visit.
 
 ## Files in this package
 ```
-index.html          the app itself
+index.html          the app itself — now wired to your Firebase project
 manifest.json        app name, icons, colors — makes it installable
 service-worker.js    caches the app so it works offline
+firestore.rules      paste into Firebase so shared data doesn't lock after 30 days
 icons/icon-192.png
 icons/icon-512.png   app icons
 ```
 Keep this folder structure exactly as-is — the icon and manifest paths inside
 `index.html` assume `icons/` sits next to it.
+
+## Shared data is now live
+`index.html` is wired to your Firebase project (`site-hse-ops`). Every phone,
+tablet and desktop that opens this app sees the same records in real time —
+add an incident on one phone and it appears on every other device within a
+second or two. Master passcode and company logo are shared the same way.
+
+**One step you must do in the Firebase console** (2 minutes): Firebase's
+default "test mode" only allows open access for 30 days, then locks
+everything down. To keep it open permanently:
+1. Go to console.firebase.google.com → your `site-hse-ops` project
+2. Build → Firestore Database → **Rules** tab
+3. Delete what's there and paste in the contents of `firestore.rules`
+   (included in this package)
+4. Click **Publish**
+
+Because this rule allows anyone with your app's link to read/write the
+database directly (bypassing the phone/PIN login if they inspected the page),
+treat the app link itself as something to only share with your team — it's
+not indexed or discoverable, but it isn't secret-proof either. If you want
+real lock-and-key security later (so even someone with the link can't touch
+the database without logging in through the app), I can add proper Firebase
+authentication — just ask.
 
 ## Deploy it in 5 minutes
 
@@ -50,17 +74,16 @@ Whenever you (or I) change `index.html`, `manifest.json` or the icons:
 ## About offline use
 - The app itself (layout, all 24 modules, forms, dashboard) works fully
   offline once it's been opened at least once on a device.
+- Data entered while offline is saved on the device immediately and syncs
+  to every other device automatically the moment it's back online
+  (Firestore's offline queue handles this — nothing extra to do).
 - PDF and Excel export need a live connection **the first time** you use them
   on a device, since they load a small library from a CDN. After that first
   successful export, the library is cached too and export keeps working
-  offline.
-- Data entered while offline is saved on that device immediately (it isn't
-  lost) — see the note on shared data below.
+  offline (though it will only include whatever data had already synced to
+  that device).
 
 ## About shared data across devices
-Right now, data lives in each device's own browser storage — a phone that
-logs an incident won't show it on another phone or on the office desktop.
-Getting every device to see the same live data needs a small free cloud
-database wired in (Firebase is the natural fit here). That's a separate step
-from this deployment — let me know when you're ready to set it up and I'll
-walk you through it and wire it into this same package.
+Data now syncs live across every device through Firebase — see "Shared data
+is now live" above for the one remaining setup step (publishing the
+Firestore rules) and an honest note on its security model.
