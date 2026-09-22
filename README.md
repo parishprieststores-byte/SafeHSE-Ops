@@ -39,6 +39,39 @@ real lock-and-key security later (so even someone with the link can't touch
 the database without logging in through the app), I can add proper Firebase
 authentication — just ask.
 
+## What's new in this update
+- **Permits & Licenses** module (separate from Permit to Work) for statutory/
+  regulatory permits — environmental discharge, air emission, waste, operating
+  licenses, etc. — with issuing authority, permit number, expiry tracking, and
+  a document upload. Permit to Work also now has a document/photo attachment
+  for the signed permit itself.
+- Manifest and service worker hardened for installability (see below).
+
+## Fixing "only Add to Home Screen, no Install"
+A few things to check, in order:
+
+1. **iPhone/iPad**: Apple does not offer a one-tap "Install" for *any* web
+   app, including Google's own — Share → Add to Home Screen is the only
+   flow that exists on iOS. This isn't fixable from the app's side; it's an
+   Apple restriction. If you're testing on iOS, what you're seeing is
+   correct/expected, not a bug.
+2. **Android / desktop Chrome**: these should show a real install icon (⊕ in
+   the address bar on desktop, "Install app" in the ⋮ menu on Android). If
+   you're only seeing "Add to Home screen" wording there:
+   - Make sure you re-uploaded the **latest** `index.html`,
+     `manifest.json`, and `service-worker.js` from this package to GitHub,
+     and that the site has redeployed (check the commit landed and give it
+     a minute).
+   - Open the live site in **desktop Chrome**, press F12 → **Application**
+     tab → **Manifest**. Chrome lists exactly why a page isn't installable
+     if it isn't (missing icon, bad start_url, etc.) — if you see an error
+     there, send me a screenshot and I'll fix it directly.
+   - In the same Application tab, check **Service Workers** — it should
+     show `service-worker.js` as "activated and is running." If it shows
+     an error instead, that's the actual blocker.
+   - Hard-refresh the page once (Ctrl+Shift+R / pull-to-refresh) after
+     deploying, since a browser may hold onto an older cached page.
+
 ## Deploy it in 5 minutes
 
 1. Go to github.com and create a **new repository** (e.g. `safehse-ops`).

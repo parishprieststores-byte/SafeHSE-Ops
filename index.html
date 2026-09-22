@@ -389,7 +389,15 @@ const MODULES = [
       f('location','Location','text'), f('requestedBy','Requested by','text'), f('approvedBy','Approved by','text'),
       f('dateIssued','Date issued','date'), f('validUntil','Valid until','date'),
       f('status','Status','select',['Pending','Approved','Active','Closed','Expired']),
-      f('precautions','Precautions','textarea')]},
+      f('precautions','Precautions','textarea'), f('photo','Signed permit document','photo')]},
+  {id:'permitsLicenses', label:'Permits & Licenses', icon:'📜', cols:['permitName','issuingAuthority','expiryDate','status'],
+    fields:[f('permitName','Permit / license name','text',null,true),
+      f('category','Category','select',['Environmental','Water/Effluent Discharge','Air Emission','Waste Management','Operating License','Building/Facility','Occupational Health','Other']),
+      f('issuingAuthority','Issuing authority','text'), f('permitNumber','Permit / reference number','text'),
+      f('issueDate','Issue date','date'), f('expiryDate','Expiry date','date'),
+      f('conditions','Conditions / requirements','textarea'), f('responsiblePerson','Responsible person','text'),
+      f('status','Status','select',['Valid','Renewal Due','Expired','Suspended']),
+      f('photo','Permit document','photo')]},
   {id:'emergency', label:'Emergency', icon:'🚨', cols:['emergencyType','location','dateOccurred','status'],
     fields:[f('emergencyType','Emergency type','select',['Fire','Medical','Chemical Spill','Natural Disaster','Security Threat','Other'],true),
       f('location','Location','text'), f('dateOccurred','Date occurred','date'), f('timeOccurred','Time','time'),
@@ -476,9 +484,14 @@ const firebaseConfig = {
   messagingSenderId: "332402277526",
   appId: "1:332402277526:web:a022b5c28fa97574ff96b7"
 };
-firebase.initializeApp(firebaseConfig);
-const fdb = firebase.firestore();
-try{ fdb.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(e){}
+let fdb = null;
+try{
+  firebase.initializeApp(firebaseConfig);
+  fdb = firebase.firestore();
+  fdb.enablePersistence({synchronizeTabs:true}).catch(function(){});
+}catch(e){
+  console.error('Firebase failed to load — running in local-only mode for this session.', e);
+}
 
 const SESSION_KEY='sg_ops_session_v1', THEME_KEY='sg_ops_theme_v1';
 function getAppLink(){ return location.href.split('#')[0]; }
@@ -493,6 +506,12 @@ let onCloudUpdate = null;            // set once the app shell is live, to re-re
 function moduleIdsForSync(){ return MODULES.filter(m=>!m.special).map(m=>m.id); }
 
 function startCloudSync(){
+  if(!fdb){
+    cloudSyncDone.settings = true;
+    moduleIdsForSync().forEach(function(id){ cloudSyncDone.modules[id] = true; if(!cloudCache[id]) cloudCache[id] = []; });
+    afterCloudChange();
+    return;
+  }
   fdb.collection('meta').doc('settings').onSnapshot(function(doc){
     settingsCache = Object.assign({masterPasscode:'1234', logo:''}, doc.exists ? doc.data() : {});
     cloudSyncDone.settings = true;
@@ -515,7 +534,10 @@ function initialSyncComplete(){
 }
 function afterCloudChange(){
   const banner = document.getElementById('syncBanner');
-  if(banner) banner.style.display = initialSyncComplete() ? 'none' : 'block';
+  if(banner){
+    if(!fdb){ banner.textContent = '⚠ Cloud sync unavailable right now — working on this device only.'; banner.style.display = 'block'; }
+    else banner.style.display = initialSyncComplete() ? 'none' : 'block';
+  }
   applyLogo();
   if(onCloudUpdate) onCloudUpdate();
 }
@@ -524,19 +546,20 @@ function getRecords(moduleId){ return cloudCache[moduleId] || []; }
 function addRecord(moduleId, rec){
   rec._id = uid(); rec._createdAt = Date.now();
   cloudCache[moduleId] = (cloudCache[moduleId]||[]).concat([rec]);
-  fdb.collection(moduleId).doc(rec._id).set(rec).catch(function(e){ console.error(e); });
+  if(fdb) fdb.collection(moduleId).doc(rec._id).set(rec).catch(function(e){ console.error(e); });
   return rec;
 }
 function updateRecordCloud(moduleId, id, patch){
   cloudCache[moduleId] = (cloudCache[moduleId]||[]).map(r=> r._id===id ? Object.assign({}, r, patch) : r);
-  fdb.collection(moduleId).doc(id).set(patch, {merge:true}).catch(function(e){ console.error(e); });
+  if(fdb) fdb.collection(moduleId).doc(id).set(patch, {merge:true}).catch(function(e){ console.error(e); });
 }
 function deleteRecordCloud(moduleId, id){
   cloudCache[moduleId] = (cloudCache[moduleId]||[]).filter(r=>r._id!==id);
-  fdb.collection(moduleId).doc(id).delete().catch(function(e){ console.error(e); });
+  if(fdb) fdb.collection(moduleId).doc(id).delete().catch(function(e){ console.error(e); });
 }
 function bulkSetRecordsCloud(moduleId, arr){
   cloudCache[moduleId] = arr;
+  if(!fdb) return;
   const batch = fdb.batch();
   arr.forEach(function(r){ if(!r._id) r._id = uid(); batch.set(fdb.collection(moduleId).doc(r._id), r); });
   batch.commit().catch(function(e){ console.error(e); });
@@ -545,13 +568,13 @@ function bulkSetRecordsCloud(moduleId, arr){
 function loadSettings(){ return settingsCache; }
 function saveSettings(s){
   settingsCache = Object.assign({}, settingsCache, s);
-  fdb.collection('meta').doc('settings').set(s, {merge:true}).catch(function(e){ console.error(e); });
+  if(fdb) fdb.collection('meta').doc('settings').set(s, {merge:true}).catch(function(e){ console.error(e); });
 }
 function getLogo(){ return settingsCache.logo || ''; }
 function setLogo(dataUrl){ saveSettings({logo:dataUrl}); }
 function removeLogo(){
   settingsCache.logo = '';
-  fdb.collection('meta').doc('settings').set({logo: firebase.firestore.FieldValue.delete()}, {merge:true}).catch(function(e){ console.error(e); });
+  if(fdb) fdb.collection('meta').doc('settings').set({logo: firebase.firestore.FieldValue.delete()}, {merge:true}).catch(function(e){ console.error(e); });
 }
 
 function getSession(){ try{ return JSON.parse(localStorage.getItem(SESSION_KEY)); }catch(e){ return null; } }
@@ -691,7 +714,7 @@ function renderDashboard(){
   const inc = getRecords('incidentAccident'), haz = getRecords('hazardReporting'),
         nm = getRecords('nearMiss'), permits = getRecords('permitToWork'),
         corr = getRecords('correctiveActions'), train = getRecords('training'),
-        insp = getRecords('safetyInspection');
+        insp = getRecords('safetyInspection'), lic = getRecords('permitsLicenses');
   const openInc = inc.filter(r=>r.status && r.status!=='Closed').length;
   const openHaz = haz.filter(r=>r.status && r.status!=='Resolved').length;
   const now = new Date(); const monthKey = now.toISOString().slice(0,7);
@@ -700,6 +723,7 @@ function renderDashboard(){
   const overdueCorr = corr.filter(r=> r.status==='Overdue' || (r.dueDate && r.status!=='Completed' && daysBetween(todayStr(), r.dueDate) < 0)).length;
   const trainSoon = train.filter(r=> r.expiryDate && daysBetween(todayStr(), r.expiryDate) <= 30 && daysBetween(todayStr(), r.expiryDate) >= 0).length;
   const inspSoon = insp.filter(r=> r.nextInspectionDate && daysBetween(todayStr(), r.nextInspectionDate) <= 14 && daysBetween(todayStr(), r.nextInspectionDate) >= 0).length;
+  const licSoon = lic.filter(r=> r.expiryDate && r.status!=='Expired' && daysBetween(todayStr(), r.expiryDate) <= 30 && daysBetween(todayStr(), r.expiryDate) >= 0).length;
   let totalRecords = 0;
   MODULES.forEach(m=>{ if(!m.special) totalRecords += getRecords(m.id).length; });
 
@@ -708,6 +732,7 @@ function renderDashboard(){
   html += statCard(openHaz, 'Open hazard reports', openHaz>0?'warn':'ok');
   html += statCard(nmMonth, 'Near misses this month', '');
   html += statCard(activePermits, 'Active permits to work', '');
+  html += statCard(licSoon, 'Permits/licenses expiring in 30 days', licSoon>0?'warn':'ok');
   html += statCard(overdueCorr, 'Overdue corrective actions', overdueCorr>0?'danger':'ok');
   html += statCard(trainSoon, 'Training expiring in 30 days', trainSoon>0?'warn':'ok');
   html += statCard(inspSoon, 'Inspections due in 14 days', inspSoon>0?'warn':'ok');

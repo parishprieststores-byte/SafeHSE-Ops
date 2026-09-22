@@ -1,7 +1,7 @@
 // SafeHSE Ops — offline app-shell cache.
 // Bump this version whenever you edit index.html/manifest.json so returning
 // devices pick up the new file instead of a stale cached copy.
-const CACHE_NAME = 'safehse-ops-v2';
+const CACHE_NAME = 'safehse-ops-v3';
 const APP_SHELL = [
   './',
   './index.html',
