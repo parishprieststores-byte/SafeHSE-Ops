@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Open read/write for every collection and document.
+    // Access to the app itself is controlled by SafeHSE Ops's own
+    // staff phone+PIN / master passcode login — not by these rules.
+    // Paste this into Firebase Console -> Firestore Database -> Rules,
+    // then click Publish, so access doesn't expire after 30 days
+    // (Firestore's default "test mode" locks down automatically).
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
