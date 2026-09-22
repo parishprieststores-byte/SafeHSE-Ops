@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SafeHSE Ops</title>
+<meta name="theme-color" content="#1C1F26">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SafeHSE Ops">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" id="appleTouchIcon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --paper:#F6F4EF; --panel:#FFFFFF; --ink:#1C1F26; --ink-soft:#5B6472;
+  --line:#DFDBD1; --accent:#D98324; --accent-ink:#3A2205;
+  --danger:#B3412A; --ok:#3F7A52; --warn:#C79A2E; --info:#3E6C8E;
+  --sidebar:#1C1F26; --sidebar-ink:#E8E6DF; --sidebar-soft:#8B93A3; --sidebar-active:#2A2F3A;
+  --focus:#D98324;
+  --radius:3px;
+  box-sizing:border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#15171B; --panel:#1C1F24; --ink:#EDEBE4; --ink-soft:#9AA1AC;
+    --line:#31353D; --accent:#E8A33D; --accent-ink:#1C1200;
+    --danger:#E07A5F; --ok:#63B37D; --warn:#E8C567; --info:#7FB1D6;
+    --sidebar:#101216; --sidebar-ink:#EDEBE4; --sidebar-soft:#7B8290; --sidebar-active:#1D2027;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#15171B; --panel:#1C1F24; --ink:#EDEBE4; --ink-soft:#9AA1AC;
+  --line:#31353D; --accent:#E8A33D; --accent-ink:#1C1200;
+  --danger:#E07A5F; --ok:#63B37D; --warn:#E8C567; --info:#7FB1D6;
+  --sidebar:#101216; --sidebar-ink:#EDEBE4; --sidebar-soft:#7B8290; --sidebar-active:#1D2027;
+}
+html,body{height:100%;}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  font-size:14px; line-height:1.5;
+}
+code,.mono{font-family:'IBM Plex Mono', ui-monospace, monospace;}
+button{font-family:inherit; cursor:pointer;}
+input,select,textarea{font-family:inherit; font-size:14px;}
+::-webkit-scrollbar{width:9px; height:9px;}
+::-webkit-scrollbar-thumb{background:var(--line); border-radius:5px;}
+a{color:inherit;}
+
+/* ---------- LOGIN ---------- */
+#loginScreen{
+  min-height:100%; display:flex; align-items:center; justify-content:center;
+  padding:24px; background:
+    linear-gradient(180deg, var(--sidebar) 0%, var(--sidebar) 42%, var(--paper) 42%);
+}
+.loginCard{
+  width:100%; max-width:420px; background:var(--panel); border:1px solid var(--line);
+  border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 0 rgba(0,0,0,.04);
+}
+.loginHead{padding:28px 28px 20px; border-bottom:1px solid var(--line);}
+.loginHead .mark{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
+.loginHead .mark .dot{width:10px; height:10px; background:var(--accent); border-radius:2px; transform:rotate(45deg); flex:none;}
+.loginHead h1{font-size:19px; margin:0; font-weight:600; letter-spacing:.2px;}
+.loginHead p{margin:6px 0 0; color:var(--ink-soft); font-size:13px;}
+.tabRow{display:flex; border-bottom:1px solid var(--line);}
+.tabBtn{flex:1; padding:12px; background:none; border:none; color:var(--ink-soft); font-weight:500; font-size:13px; border-bottom:2px solid transparent;}
+.tabBtn.active{color:var(--ink); border-bottom-color:var(--accent);}
+.loginBody{padding:24px 28px 28px;}
+.field{margin-bottom:14px;}
+.field label{display:block; font-size:12.5px; color:var(--ink-soft); margin-bottom:5px;}
+.field input, .field select, .field textarea{
+  width:100%; padding:10px 11px; border:1px solid var(--line); border-radius:var(--radius);
+  background:var(--paper); color:var(--ink);
+}
+.field input:focus, .field select:focus, .field textarea:focus{outline:2px solid var(--focus); outline-offset:1px;}
+.btnPrimary{
+  width:100%; padding:11px; background:var(--accent); color:var(--accent-ink); border:none;
+  border-radius:var(--radius); font-weight:600; font-size:14px;
+}
+.btnPrimary:active{transform:translateY(1px);}
+.loginNote{margin-top:14px; font-size:12px; color:var(--ink-soft); line-height:1.5;}
+.loginMsg{margin-top:12px; font-size:13px; padding:9px 11px; border-radius:var(--radius); display:none;}
+.loginMsg.show{display:block;}
+.loginMsg.err{background:rgba(179,65,42,.12); color:var(--danger);}
+.loginMsg.ok{background:rgba(63,122,82,.12); color:var(--ok);}
+.pane{display:none;}
+.pane.active{display:block;}
+
+/* ---------- APP SHELL ---------- */
+#app{display:none; min-height:100%;}
+#app.show{display:flex;}
+#sidebar{
+  width:248px; flex:none; background:var(--sidebar); color:var(--sidebar-ink);
+  display:flex; flex-direction:column; height:100vh; height:100dvh; position:sticky; top:0;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.sbHead{padding:20px 18px 14px; border-bottom:1px solid rgba(255,255,255,.08);}
+.sbHead .mark{display:flex; align-items:center; gap:9px;}
+.sbHead .dot{width:9px; height:9px; background:var(--accent); border-radius:2px; transform:rotate(45deg);}
+.sbHead h2{font-size:15px; margin:0; font-weight:600;}
+.sbHead .who{font-size:11.5px; color:var(--sidebar-soft); margin-top:8px;}
+#navList{list-style:none; margin:0; padding:8px; overflow-y:auto; flex:1;}
+.navItem{
+  display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:var(--radius);
+  color:var(--sidebar-soft); font-size:13.5px; margin-bottom:1px; border-left:2px solid transparent;
+}
+.navItem .ic{font-size:15px; width:18px; text-align:center; flex:none;}
+.navItem:hover{background:var(--sidebar-active); color:var(--sidebar-ink);}
+.navItem.active{background:var(--sidebar-active); color:var(--sidebar-ink); border-left-color:var(--accent);}
+.sbFoot{padding:12px; border-top:1px solid rgba(255,255,255,.08); display:flex; gap:8px;}
+.sbBtn{
+  flex:1; padding:8px; background:transparent; border:1px solid rgba(255,255,255,.16); color:var(--sidebar-ink);
+  border-radius:var(--radius); font-size:12.5px;
+}
+.sbBtn:hover{background:var(--sidebar-active);}
+
+#main{flex:1; min-width:0; display:flex; flex-direction:column; height:100vh; height:100dvh; overflow:hidden;}
+#topbar{
+  padding:14px 22px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px;
+  background:var(--panel); flex:none;
+}
+#hamburger{display:none; background:none; border:1px solid var(--line); border-radius:var(--radius); width:34px; height:34px; color:var(--ink); font-size:16px;}
+#topTitle{font-size:17px; font-weight:600; flex:1; min-width:0;}
+#topTitle .sub{font-size:12px; color:var(--ink-soft); font-weight:400; display:block; margin-top:1px;}
+.iconBtn{
+  background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:var(--radius);
+  padding:8px 12px; font-size:13px; display:flex; align-items:center; gap:6px;
+}
+.iconBtn:hover{border-color:var(--ink-soft);}
+#content{flex:1; overflow-y:auto; padding:22px; padding-bottom:calc(22px + env(safe-area-inset-bottom, 0px));}
+.overlay{position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:40; display:none;}
+.overlay.show{display:block;}
+
+/* ---------- DASHBOARD ---------- */
+.grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:12px; margin-bottom:22px;}
+.stat{background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:var(--radius); padding:14px 16px;}
+.stat .n{font-family:'IBM Plex Mono'; font-size:26px; font-weight:600; line-height:1;}
+.stat .l{font-size:12.5px; color:var(--ink-soft); margin-top:6px;}
+.stat.danger{border-left-color:var(--danger);}
+.stat.warn{border-left-color:var(--warn);}
+.stat.ok{border-left-color:var(--ok);}
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px; margin-bottom:18px;}
+.panel h3{margin:0 0 12px; font-size:14.5px; font-weight:600;}
+.activityRow{display:flex; align-items:baseline; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:13px;}
+.activityRow:last-child{border-bottom:none;}
+.activityRow .mod{color:var(--ink-soft); font-size:12px; flex:none; width:120px;}
+.activityRow .ttl{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.activityRow .t{color:var(--ink-soft); font-size:11.5px; font-family:'IBM Plex Mono'; flex:none;}
+.emptyState{padding:30px 10px; text-align:center; color:var(--ink-soft); font-size:13px;}
+
+/* ---------- MODULE / TABLE ---------- */
+.moduleBar{display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap;}
+.searchBox{
+  flex:1; min-width:180px; padding:9px 12px; border:1px solid var(--line); border-radius:var(--radius);
+  background:var(--panel); color:var(--ink);
+}
+.tableWrap{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); overflow-x:auto;}
+table{width:100%; border-collapse:collapse; min-width:560px;}
+th{
+  text-align:left; padding:11px 14px; font-size:11.5px; color:var(--ink-soft); font-weight:500;
+  border-bottom:1px solid var(--line); white-space:nowrap;
+}
+td{padding:11px 14px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr{cursor:pointer;}
+tbody tr:hover{background:rgba(217,131,36,.06);}
+.badge{
+  display:inline-block; padding:3px 9px; border-radius:20px; font-size:11.5px; font-weight:500;
+  background:var(--line); color:var(--ink);
+}
+.badge.b-ok{background:rgba(63,122,82,.15); color:var(--ok);}
+.badge.b-warn{background:rgba(199,154,46,.18); color:var(--warn);}
+.badge.b-danger{background:rgba(179,65,42,.15); color:var(--danger);}
+.badge.b-info{background:rgba(62,108,142,.15); color:var(--info);}
+.rowActions{display:flex; gap:6px; justify-content:flex-end;}
+.miniBtn{background:none; border:1px solid var(--line); border-radius:var(--radius); padding:5px 9px; font-size:12px; color:var(--ink-soft);}
+.miniBtn:hover{color:var(--ink); border-color:var(--ink-soft);}
+.miniBtn.del:hover{color:var(--danger); border-color:var(--danger);}
+
+/* ---------- MODAL ---------- */
+.modalWrap{position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-start; justify-content:center; z-index:60; overflow-y:auto; padding:5vh 16px;}
+.modalWrap.show{display:flex;}
+.modalBox{background:var(--panel); border-radius:var(--radius); width:100%; max-width:560px; margin-bottom:5vh; border:1px solid var(--line);}
+.modalHead{padding:18px 20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;}
+.modalHead h3{margin:0; font-size:15.5px; font-weight:600;}
+.modalHead button{background:none; border:none; font-size:18px; color:var(--ink-soft); line-height:1;}
+.modalBody{padding:20px; max-height:60vh; overflow-y:auto;}
+.modalFoot{padding:16px 20px; border-top:1px solid var(--line); display:flex; gap:10px; justify-content:flex-end;}
+.btnGhost{padding:9px 16px; background:none; border:1px solid var(--line); border-radius:var(--radius); color:var(--ink); font-size:13px;}
+.btnSolid{padding:9px 18px; background:var(--accent); border:none; border-radius:var(--radius); color:var(--accent-ink); font-weight:600; font-size:13px;}
+.btnDanger{padding:9px 18px; background:var(--danger); border:none; border-radius:var(--radius); color:#fff; font-weight:600; font-size:13px;}
+.checkField{display:flex; align-items:center; gap:9px;}
+.checkField input{width:auto;}
+
+/* ---------- REPORTS / SETTINGS ---------- */
+.reportRow{display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:12px 0; border-bottom:1px solid var(--line);}
+.reportRow:last-child{border-bottom:none;}
+.reportRow select{flex:1; min-width:180px; padding:9px 11px; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); color:var(--ink);}
+
+@media (max-width:860px){
+  #sidebar{position:fixed; left:0; top:0; bottom:0; z-index:50; transform:translateX(-100%); transition:transform .18s ease;}
+  #sidebar.open{transform:translateX(0);}
+  #hamburger{display:flex; align-items:center; justify-content:center;}
+  #content{padding:16px;}
+  .stat .n{font-size:22px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="loginScreen">
+  <div class="loginCard">
+    <div class="loginHead">
+      <div class="mark" id="loginMark"><span class="dot"></span><h1>SafeHSE Ops</h1></div>
+      <p>Health, Safety &amp; Environment operations management</p>
+    </div>
+    <div class="tabRow">
+      <button class="tabBtn active" id="tabStaffBtn" onclick="switchLoginTab('staff')">Staff login</button>
+      <button class="tabBtn" id="tabMasterBtn" onclick="switchLoginTab('master')">Master login</button>
+    </div>
+    <div class="loginBody">
+      <div class="pane active" id="paneStaff">
+        <div class="field"><label>Phone number</label><input id="staffPhone" inputmode="tel" placeholder="e.g. 0771234567"></div>
+        <div class="field"><label>PIN</label><input id="staffPin" type="password" inputmode="numeric" placeholder="4-6 digit PIN"></div>
+        <button class="btnPrimary" onclick="attemptStaffLogin()">Sign in</button>
+        <p class="loginNote">Not registered yet? Ask your Master (CSI / MD / M) to add your phone number and PIN under Staff &amp; Users.</p>
+      </div>
+      <div class="pane" id="paneMaster">
+        <div class="field"><label>Master passcode</label><input id="masterPass" type="password" placeholder="Enter master passcode"></div>
+        <button class="btnPrimary" onclick="attemptMasterLogin()">Sign in as Master</button>
+        <p class="loginNote">Restricted to CSI / MD / M. Default passcode on first run is <b>1234</b> — change it from Settings once logged in.</p>
+      </div>
+      <div class="loginMsg" id="loginMsg"></div>
+      <button class="btnGhost installTrigger" style="display:none; width:100%; margin-top:14px;" onclick="triggerInstall()">⭳ Install this app</button>
+      <p class="loginNote iosInstallHint" style="display:none;">On iPhone / iPad: tap the Share icon, then "Add to Home Screen". On Android or a desktop browser, use the install button above, or your browser menu → "Install app".</p>
+      <p class="loginNote" id="appLinkNote" style="display:none;"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+<div id="app">
+  <aside id="sidebar">
+    <div class="sbHead">
+      <div class="mark" id="sidebarMark"><span class="dot"></span><h2>SafeHSE Ops</h2></div>
+      <div class="who" id="whoLine">—</div>
+    </div>
+    <ul id="navList"></ul>
+    <div class="sbFoot">
+      <button class="sbBtn" id="settingsBtn" onclick="navigateTo('settings')" style="display:none;">⚙ Settings</button>
+      <button class="sbBtn" onclick="logout()">Log out</button>
+    </div>
+  </aside>
+
+  <div id="main">
+    <div id="topbar">
+      <button id="hamburger" onclick="openSidebar()">☰</button>
+      <div id="topTitle">Dashboard<span class="sub" id="topSub">Overview across all safety modules</span></div>
+      <button class="iconBtn installTrigger" style="display:none;" onclick="triggerInstall()">⭳ Install app</button>
+      <button class="iconBtn" onclick="toggleTheme()" id="themeBtn">◐ Theme</button>
+    </div>
+    <div id="content"></div>
+  </div>
+</div>
+
+<!-- ================= MODAL ================= -->
+<div class="modalWrap" id="modalWrap">
+  <div class="modalBox">
+    <div class="modalHead"><h3 id="modalTitle">Add record</h3><button onclick="closeModal()">✕</button></div>
+    <div class="modalBody" id="modalBody"></div>
+    <div class="modalFoot">
+      <button class="btnGhost" onclick="closeModal()">Cancel</button>
+      <button class="btnSolid" onclick="saveModal()" id="modalSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modalWrap" id="confirmWrap">
+  <div class="modalBox" style="max-width:400px;">
+    <div class="modalHead"><h3>Confirm</h3><button onclick="closeConfirm()">✕</button></div>
+    <div class="modalBody" id="confirmMsg">Are you sure?</div>
+    <div class="modalFoot">
+      <button class="btnGhost" onclick="closeConfirm()">Cancel</button>
+      <button class="btnDanger" id="confirmDoBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========================================================================
+   CONFIG
+   ======================================================================== */
+function f(key,label,type,options,required){ return {key,label,type,options:options||null,required:!!required}; }
+
+const MODULES = [
+  {id:'dashboard', label:'Dashboard', icon:'📊', special:'dashboard'},
+  {id:'riskAssessment', label:'Risk Assessment', icon:'⚠️', cols:['title','area','riskLevel','status'],
+    fields:[f('title','Title','text',null,true), f('area','Area / location','text'),
+      f('hazardDescription','Hazard description','textarea'),
+      f('riskLevel','Risk level','select',['Low','Medium','High','Critical']),
+      f('likelihood','Likelihood (1-5)','select',['1','2','3','4','5']),
+      f('severity','Severity (1-5)','select',['1','2','3','4','5']),
+      f('controlMeasures','Control measures','textarea'),
+      f('assessedBy','Assessed by','text'), f('dateAssessed','Date assessed','date'),
+      f('reviewDate','Review date','date'),
+      f('status','Status','select',['Open','In Review','Closed'])]},
+  {id:'jobHazardAnalysis', label:'JHA / JSA', icon:'📝', cols:['jobTask','department','steps','status'],
+    fields:[f('jobTask','Job / task name','text',null,true), f('department','Department / area','text'),
+      f('preparedBy','Prepared by','text'), f('approvedBy','Approved by','text'),
+      f('datePrepared','Date prepared','date'), f('requiredPPE','Required PPE','text'),
+      f('permitsRequired','Permits required','text'), f('participants','Participants','textarea'),
+      f('status','Status','select',['Draft','Under Review','Approved']),
+      f('reviewDate','Review date','date')]},
+  {id:'hazardReporting', label:'Hazard Reporting', icon:'🚧', cols:['hazardTitle','location','category','status'],
+    fields:[f('hazardTitle','Hazard title','text',null,true), f('location','Location','text'),
+      f('category','Category','select',['Physical','Chemical','Biological','Ergonomic','Electrical','Other']),
+      f('description','Description','textarea'),
+      f('severity','Severity','select',['Low','Medium','High','Critical']),
+      f('reportedBy','Reported by','text'), f('dateReported','Date reported','date'),
+      f('actionTaken','Action taken','textarea'),
+      f('status','Status','select',['Reported','Investigating','Resolved']),
+      f('photo','Photo evidence','photo')]},
+  {id:'incidentAccident', label:'Incident / Accident', icon:'🚑', cols:['title','type','location','status'],
+    fields:[f('title','Title','text',null,true), f('type','Type','select',['Incident','Accident']),
+      f('location','Location','text'), f('dateOccurred','Date occurred','date'), f('timeOccurred','Time','time'),
+      f('personsInvolved','Persons involved','text'), f('description','Description','textarea'),
+      f('injuryType','Injury type','text'), f('severity','Severity','select',['Minor','Moderate','Major','Fatal']),
+      f('reportedBy','Reported by','text'), f('witnesses','Witnesses','text'),
+      f('immediateAction','Immediate action taken','textarea'),
+      f('status','Status','select',['Open','Investigating','Closed']),
+      f('photo','Photo evidence','photo')]},
+  {id:'nearMiss', label:'Near Miss', icon:'🔶', cols:['title','location','potentialSeverity','status'],
+    fields:[f('title','Title','text',null,true), f('location','Location','text'), f('dateOccurred','Date occurred','date'),
+      f('description','Description','textarea'),
+      f('potentialSeverity','Potential severity','select',['Low','Medium','High','Critical']),
+      f('reportedBy','Reported by','text'), f('correctivePreventive','Corrective / preventive action','textarea'),
+      f('status','Status','select',['Open','Reviewed','Closed']), f('photo','Photo evidence','photo')]},
+  {id:'safetyInspection', label:'Safety Inspection', icon:'🧭', cols:['inspectionArea','inspector','status','nextInspectionDate'],
+    fields:[f('inspectionArea','Inspection area','text',null,true), f('inspector','Inspector','text'),
+      f('dateInspected','Date inspected','date'), f('checklistNotes','Checklist notes','textarea'),
+      f('findings','Findings','textarea'), f('riskRating','Risk rating','select',['Low','Medium','High']),
+      f('status','Status','select',['Passed','Failed','Follow-up Required']),
+      f('nextInspectionDate','Next inspection date','date'), f('photo','Photo evidence','photo')]},
+  {id:'checklists', label:'Checklists', icon:'🗒️', cols:['checklistTitle','category','progress','status'],
+    fields:[f('checklistTitle','Checklist title','text',null,true),
+      f('category','Category','select',['General Safety','Fire Safety','PPE','Housekeeping','Chemical','Vehicle','Emergency Preparedness','Other']),
+      f('assignedTo','Completed by','text'), f('dateCompleted','Date completed','date'),
+      f('status','Status','select',['In Progress','Complete']), f('notes','Notes','textarea')]},
+  {id:'fireSafety', label:'Fire Safety', icon:'🔥', cols:['itemType','location','condition','nextCheckDate'],
+    fields:[f('itemType','Item type','select',['Extinguisher','Alarm','Sprinkler','Exit Route','Fire Drill'],true),
+      f('location','Location','text'), f('lastCheckDate','Last check date','date'), f('nextCheckDate','Next check date','date'),
+      f('condition','Condition','select',['Good','Needs Attention','Faulty']),
+      f('inspectedBy','Inspected by','text'), f('notes','Notes','textarea'), f('photo','Photo evidence','photo')]},
+  {id:'ppe', label:'PPE', icon:'🦺', cols:['itemName','category','assignedTo','replacementDue'],
+    fields:[f('itemName','Item name','text',null,true),
+      f('category','Category','select',['Head','Eye','Hearing','Respiratory','Hand','Foot','Body','Fall Protection']),
+      f('assignedTo','Assigned to','text'), f('quantityIssued','Quantity issued','number'),
+      f('dateIssued','Date issued','date'), f('condition','Condition','select',['New','Good','Worn','Damaged']),
+      f('replacementDue','Replacement due','date'), f('notes','Notes','textarea')]},
+  {id:'training', label:'Training', icon:'🎓', cols:['trainingTitle','trainee','expiryDate','status'],
+    fields:[f('trainingTitle','Training title','text',null,true), f('trainee','Trainee','text'), f('trainer','Trainer','text'),
+      f('category','Category','select',['Induction','Fire Safety','First Aid','Manual Handling','Chemical Handling','Other']),
+      f('dateCompleted','Date completed','date'), f('expiryDate','Expiry date','date'),
+      f('status','Status','select',['Completed','Scheduled','Expired']), f('certificateRef','Certificate reference','text')]},
+  {id:'equipment', label:'Equipment', icon:'🛠️', cols:['equipmentName','location','condition','nextServiceDate'],
+    fields:[f('equipmentName','Equipment name','text',null,true), f('type','Type','text'), f('location','Location','text'),
+      f('serialNumber','Serial number','text'), f('lastServiceDate','Last service date','date'),
+      f('nextServiceDate','Next service date','date'),
+      f('condition','Condition','select',['Operational','Under Maintenance','Out of Service']),
+      f('assignedTo','Assigned to','text'), f('notes','Notes','textarea'), f('photo','Photo evidence','photo')]},
+  {id:'permitToWork', label:'Permit to Work', icon:'📋', cols:['permitType','location','validUntil','status'],
+    fields:[f('permitType','Permit type','select',['Hot Work','Confined Space','Working at Height','Electrical','Excavation','Other'],true),
+      f('location','Location','text'), f('requestedBy','Requested by','text'), f('approvedBy','Approved by','text'),
+      f('dateIssued','Date issued','date'), f('validUntil','Valid until','date'),
+      f('status','Status','select',['Pending','Approved','Active','Closed','Expired']),
+      f('precautions','Precautions','textarea')]},
+  {id:'emergency', label:'Emergency', icon:'🚨', cols:['emergencyType','location','dateOccurred','status'],
+    fields:[f('emergencyType','Emergency type','select',['Fire','Medical','Chemical Spill','Natural Disaster','Security Threat','Other'],true),
+      f('location','Location','text'), f('dateOccurred','Date occurred','date'), f('timeOccurred','Time','time'),
+      f('description','Description','textarea'), f('responseAction','Response action','textarea'),
+      f('respondedBy','Responded by','text'), f('status','Status','select',['Active','Resolved'])]},
+  {id:'firstAid', label:'First Aid', icon:'🩹', cols:['incidentType','personTreated','dateTreated','status'],
+    fields:[f('incidentType','Incident type','text',null,true), f('personTreated','Person treated','text'),
+      f('location','Location','text'), f('dateTreated','Date treated','date'),
+      f('injuryDescription','Injury description','textarea'), f('treatmentGiven','Treatment given','textarea'),
+      f('treatedBy','Treated by','text'), f('referredToHospital','Referred to hospital','checkbox'),
+      f('followUpRequired','Follow-up required','checkbox'), f('status','Status','select',['Open','Closed'])]},
+  {id:'security', label:'Security', icon:'🛡️', cols:['incidentType','location','dateOccurred','status'],
+    fields:[f('incidentType','Incident type','select',['Theft','Trespass','Vandalism','Suspicious Activity','Other'],true),
+      f('location','Location','text'), f('dateOccurred','Date occurred','date'), f('timeOccurred','Time','time'),
+      f('description','Description','textarea'), f('reportedBy','Reported by','text'),
+      f('actionTaken','Action taken','textarea'), f('status','Status','select',['Open','Investigating','Closed'])]},
+  {id:'accessControl', label:'Access Control', icon:'🔑', cols:['personName','accessLevel','area','status'],
+    fields:[f('personName','Person name','text',null,true),
+      f('accessLevel','Access level','select',['Full','Restricted','Visitor','Contractor']),
+      f('area','Area','text'), f('cardKeyId','Card / key ID','text'), f('issueDate','Issue date','date'),
+      f('expiryDate','Expiry date','date'), f('status','Status','select',['Active','Revoked','Expired'])]},
+  {id:'visitorManagement', label:'Visitor Management', icon:'👥', cols:['visitorName','company','hostEmployee','status'],
+    fields:[f('visitorName','Visitor name','text',null,true), f('company','Company','text'),
+      f('hostEmployee','Host employee','text'), f('purpose','Purpose of visit','text'),
+      f('dateIn','Date in','date'), f('timeIn','Time in','time'), f('timeOut','Time out','time'),
+      f('badgeNumber','Badge number','text'), f('signedNda','Signed NDA','checkbox'),
+      f('status','Status','select',['On-site','Checked-out'])]},
+  {id:'contractorSafety', label:'Contractor Safety', icon:'👷', cols:['contractorName','company','startDate','status'],
+    fields:[f('contractorName','Contractor name','text',null,true), f('company','Company','text'),
+      f('workDescription','Work description','textarea'), f('siteInductionDate','Site induction date','date'),
+      f('insuranceValid','Insurance valid','checkbox'), f('riskAssessmentSubmitted','Risk assessment submitted','checkbox'),
+      f('startDate','Start date','date'), f('endDate','End date','date'), f('supervisor','Supervisor','text'),
+      f('status','Status','select',['Active','Completed','Suspended'])]},
+  {id:'vehicleSafety', label:'Vehicle Safety', icon:'🚗', cols:['vehicleId','driverName','condition','nextServiceDate'],
+    fields:[f('vehicleId','Vehicle ID / plate','text',null,true), f('driverName','Driver name','text'),
+      f('inspectionDate','Inspection date','date'), f('mileage','Mileage','number'),
+      f('condition','Condition','select',['Roadworthy','Needs Repair','Out of Service']),
+      f('lastServiceDate','Last service date','date'), f('nextServiceDate','Next service date','date'),
+      f('incidentNotes','Incident notes','textarea'), f('photo','Photo evidence','photo')]},
+  {id:'chemicalSafety', label:'Chemical Safety', icon:'⚗️', cols:['chemicalName','location','hazardClass','lastReviewDate'],
+    fields:[f('chemicalName','Chemical name','text',null,true), f('location','Storage location','text'),
+      f('sdsAvailable','SDS available','checkbox'), f('quantity','Quantity','text'), f('storageCondition','Storage condition','text'),
+      f('hazardClass','Hazard class','select',['Flammable','Corrosive','Toxic','Reactive','Other']),
+      f('handledBy','Handled by','text'), f('lastReviewDate','Last review date','date'), f('notes','Notes','textarea'),
+      f('photo','Photo evidence','photo')]},
+  {id:'environmental', label:'Environmental', icon:'🌱', cols:['category','location','dateRecorded','status'],
+    fields:[f('category','Category','select',['Waste Management','Emissions','Water','Energy','Spill','Other'],true),
+      f('location','Location','text'), f('description','Description','textarea'), f('dateRecorded','Date recorded','date'),
+      f('actionTaken','Action taken','textarea'), f('recordedBy','Recorded by','text'),
+      f('status','Status','select',['Open','Monitoring','Closed'])]},
+  {id:'audit', label:'Audit', icon:'🔍', cols:['auditType','area','dateConducted','status'],
+    fields:[f('auditType','Audit type','select',['Internal','External','Regulatory'],true), f('area','Area','text'),
+      f('auditor','Auditor','text'), f('dateConducted','Date conducted','date'), f('findings','Findings','textarea'),
+      f('score','Score','text'), f('status','Status','select',['Passed','Failed','Follow-up Required']),
+      f('nextAuditDate','Next audit date','date')]},
+  {id:'correctiveActions', label:'Corrective Actions', icon:'✅', cols:['issueDescription','assignedTo','dueDate','status'],
+    fields:[f('relatedModule','Related module','text'), f('issueDescription','Issue description','textarea',null,true),
+      f('actionRequired','Action required','textarea'), f('assignedTo','Assigned to','text'), f('dueDate','Due date','date'),
+      f('dateCompleted','Date completed','date'), f('status','Status','select',['Open','In Progress','Completed','Overdue']),
+      f('priority','Priority','select',['Low','Medium','High','Critical'])]},
+  {id:'reports', label:'Reports', icon:'📈', special:'reports'},
+  {id:'staffUsers', label:'Staff / Users', icon:'🧑‍💼', cols:['fullName','phoneNumber','role','status'],
+    fields:[f('fullName','Full name','text',null,true), f('phoneNumber','Phone number','text',null,true),
+      f('pin','PIN','text',null,true), f('role','Role','select',['Staff','Supervisor','CSI','MD','M']),
+      f('department','Department','text'), f('dateAdded','Date added','date'),
+      f('status','Status','select',['Active','Inactive'])]},
+];
+function getModule(id){ return MODULES.find(m=>m.id===id); }
+
+/* ========================================================================
+   STORAGE
+   ======================================================================== */
+const DATA_KEY='sg_ops_data_v1', SETTINGS_KEY='sg_ops_settings_v1', SESSION_KEY='sg_ops_session_v1', THEME_KEY='sg_ops_theme_v1', LOGO_KEY='sg_ops_logo_v1';
+function getAppLink(){ return location.href.split('#')[0]; }
+function getLogo(){ try{ return localStorage.getItem(LOGO_KEY) || ''; }catch(e){ return ''; } }
+function setLogo(dataUrl){ try{ localStorage.setItem(LOGO_KEY, dataUrl); }catch(e){} }
+function removeLogo(){ try{ localStorage.removeItem(LOGO_KEY); }catch(e){} }
+
+function loadData(){
+  try{ return JSON.parse(localStorage.getItem(DATA_KEY)) || {}; }catch(e){ return {}; }
+}
+function saveData(d){ try{ localStorage.setItem(DATA_KEY, JSON.stringify(d)); }catch(e){ console.error(e); } }
+function getRecords(moduleId){ const d=loadData(); return d[moduleId] || []; }
+function setRecords(moduleId, arr){ const d=loadData(); d[moduleId]=arr; saveData(d); }
+
+function loadSettings(){
+  try{
+    let s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    if(!s){ s = {masterPasscode:'1234'}; localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+    return s;
+  }catch(e){ return {masterPasscode:'1234'}; }
+}
+function saveSettings(s){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+
+function getSession(){ try{ return JSON.parse(localStorage.getItem(SESSION_KEY)); }catch(e){ return null; } }
+function setSession(s){ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }
+function clearSession(){ localStorage.removeItem(SESSION_KEY); }
+
+let currentUser = null;
+let currentModuleId = 'dashboard';
+
+/* ========================================================================
+   LOGIN
+   ======================================================================== */
+function switchLoginTab(which){
+  document.getElementById('tabStaffBtn').classList.toggle('active', which==='staff');
+  document.getElementById('tabMasterBtn').classList.toggle('active', which==='master');
+  document.getElementById('paneStaff').classList.toggle('active', which==='staff');
+  document.getElementById('paneMaster').classList.toggle('active', which==='master');
+  showLoginMsg('');
+}
+function showLoginMsg(msg, kind){
+  const el = document.getElementById('loginMsg');
+  if(!msg){ el.className='loginMsg'; el.textContent=''; return; }
+  el.className = 'loginMsg show ' + (kind||'err');
+  el.textContent = msg;
+}
+function attemptStaffLogin(){
+  const phone = document.getElementById('staffPhone').value.trim();
+  const pin = document.getElementById('staffPin').value.trim();
+  if(!phone || !pin){ showLoginMsg('Enter your phone number and PIN.'); return; }
+  const staff = getRecords('staffUsers');
+  const match = staff.find(s => (s.phoneNumber||'').replace(/\s+/g,'') === phone.replace(/\s+/g,'') && (s.pin||'')===pin);
+  if(!match){ showLoginMsg('No matching staff account found. Check your details or ask Master to register you.'); return; }
+  if(match.status === 'Inactive'){ showLoginMsg('This account is inactive. Contact your Master.'); return; }
+  currentUser = {type:'staff', id:match._id, name:match.fullName, role:match.role||'Staff'};
+  setSession(currentUser);
+  enterApp();
+}
+function attemptMasterLogin(){
+  const pass = document.getElementById('masterPass').value;
+  const s = loadSettings();
+  if(pass !== s.masterPasscode){ showLoginMsg('Incorrect master passcode.'); return; }
+  currentUser = {type:'master', name:'Master', role:'Master'};
+  setSession(currentUser);
+  enterApp();
+}
+function logout(){
+  clearSession(); currentUser=null;
+  document.getElementById('app').classList.remove('show');
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('staffPhone').value=''; document.getElementById('staffPin').value='';
+  document.getElementById('masterPass').value='';
+  showLoginMsg('');
+}
+function enterApp(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('app').classList.add('show');
+  document.getElementById('whoLine').textContent = currentUser.name + ' · ' + currentUser.role;
+  document.getElementById('settingsBtn').style.display = currentUser.type==='master' ? 'block' : 'none';
+  buildSidebar();
+  navigateTo('dashboard');
+}
+
+/* ========================================================================
+   SIDEBAR / NAV
+   ======================================================================== */
+function buildSidebar(){
+  const list = document.getElementById('navList');
+  list.innerHTML='';
+  MODULES.forEach(m=>{
+    const li = document.createElement('li');
+    li.className='navItem'; li.id='nav_'+m.id;
+    li.innerHTML = '<span class="ic">'+m.icon+'</span><span>'+m.label+'</span>';
+    li.onclick = ()=>{ navigateTo(m.id); closeSidebar(); };
+    list.appendChild(li);
+  });
+}
+function openSidebar(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('overlay').classList.add('show'); }
+function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('overlay').classList.remove('show'); }
+
+function navigateTo(moduleId){
+  currentModuleId = moduleId;
+  document.querySelectorAll('.navItem').forEach(n=>n.classList.remove('active'));
+  const navEl = document.getElementById('nav_'+moduleId);
+  if(navEl) navEl.classList.add('active');
+  const m = getModule(moduleId);
+  const titleEl = document.getElementById('topTitle');
+  if(moduleId==='settings'){
+    titleEl.innerHTML = 'Settings<span class="sub">Backup, restore and passcode</span>';
+    renderSettings();
+    return;
+  }
+  titleEl.innerHTML = m.label + '<span class="sub">' + subtitleFor(m) + '</span>';
+  if(m.special==='dashboard') renderDashboard();
+  else if(m.special==='reports') renderReports();
+  else renderCrud(m);
+}
+function subtitleFor(m){
+  if(m.special==='dashboard') return 'Overview across all safety modules';
+  if(m.special==='reports') return 'Export any module to PDF or Excel';
+  return 'Records, tracking and exports';
+}
+
+/* ========================================================================
+   HELPERS
+   ======================================================================== */
+function esc(v){ if(v===undefined||v===null) return ''; return String(v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+function fmtDate(v){ if(!v) return '—'; return v; }
+function statusBadgeClass(v){
+  if(!v) return '';
+  const s = String(v).toLowerCase();
+  if(['closed','completed','resolved','approved','passed','active','operational','ok','good','checked-out','roadworthy'].includes(s)) return 'b-ok';
+  if(['open','pending','reported','scheduled','on-site','monitoring'].includes(s)) return 'b-info';
+  if(['critical','failed','faulty','overdue','expired','revoked','out of service','fatal','major','suspended','needs repair','damaged'].includes(s)) return 'b-danger';
+  return 'b-warn';
+}
+function displayName(m, rec){
+  const key = (m.cols && m.cols[0]) || (m.fields[0] && m.fields[0].key);
+  return rec[key] || '(untitled)';
+}
+
+/* ========================================================================
+   DASHBOARD
+   ======================================================================== */
+function renderDashboard(){
+  const c = document.getElementById('content');
+  const inc = getRecords('incidentAccident'), haz = getRecords('hazardReporting'),
+        nm = getRecords('nearMiss'), permits = getRecords('permitToWork'),
+        corr = getRecords('correctiveActions'), train = getRecords('training'),
+        insp = getRecords('safetyInspection');
+  const openInc = inc.filter(r=>r.status && r.status!=='Closed').length;
+  const openHaz = haz.filter(r=>r.status && r.status!=='Resolved').length;
+  const now = new Date(); const monthKey = now.toISOString().slice(0,7);
+  const nmMonth = nm.filter(r=>r.dateOccurred && r.dateOccurred.slice(0,7)===monthKey).length;
+  const activePermits = permits.filter(r=>r.status==='Active').length;
+  const overdueCorr = corr.filter(r=> r.status==='Overdue' || (r.dueDate && r.status!=='Completed' && daysBetween(todayStr(), r.dueDate) < 0)).length;
+  const trainSoon = train.filter(r=> r.expiryDate && daysBetween(todayStr(), r.expiryDate) <= 30 && daysBetween(todayStr(), r.expiryDate) >= 0).length;
+  const inspSoon = insp.filter(r=> r.nextInspectionDate && daysBetween(todayStr(), r.nextInspectionDate) <= 14 && daysBetween(todayStr(), r.nextInspectionDate) >= 0).length;
+  let totalRecords = 0; const data = loadData();
+  MODULES.forEach(m=>{ if(!m.special) totalRecords += (data[m.id]||[]).length; });
+
+  let html = '<div class="grid">';
+  html += statCard(openInc, 'Open incidents / accidents', openInc>0?'danger':'ok');
+  html += statCard(openHaz, 'Open hazard reports', openHaz>0?'warn':'ok');
+  html += statCard(nmMonth, 'Near misses this month', '');
+  html += statCard(activePermits, 'Active permits to work', '');
+  html += statCard(overdueCorr, 'Overdue corrective actions', overdueCorr>0?'danger':'ok');
+  html += statCard(trainSoon, 'Training expiring in 30 days', trainSoon>0?'warn':'ok');
+  html += statCard(inspSoon, 'Inspections due in 14 days', inspSoon>0?'warn':'ok');
+  html += statCard(totalRecords, 'Total records logged', '');
+  html += '</div>';
+
+  html += '<div class="panel"><h3>Recent activity</h3><div id="recentList">';
+  let all = [];
+  MODULES.forEach(m=>{
+    if(m.special) return;
+    (data[m.id]||[]).forEach(r=> all.push({mod:m.label, name:displayName(m,r), t:r._createdAt||0}));
+  });
+  all.sort((a,b)=>b.t-a.t);
+  all = all.slice(0,10);
+  if(all.length===0){ html += '<div class="emptyState">No records yet. Start by adding an entry in any module.</div>'; }
+  else{
+    all.forEach(a=>{
+      const d = a.t ? new Date(a.t).toLocaleString() : '';
+      html += '<div class="activityRow"><span class="mod">'+esc(a.mod)+'</span><span class="ttl">'+esc(a.name)+'</span><span class="t">'+esc(d)+'</span></div>';
+    });
+  }
+  html += '</div></div>';
+  c.innerHTML = html;
+}
+function statCard(n, label, kind){
+  return '<div class="stat '+(kind||'')+'"><div class="n">'+n+'</div><div class="l">'+esc(label)+'</div></div>';
+}
+
+/* ========================================================================
+   CRUD MODULE VIEW
+   ======================================================================== */
+function renderCrud(m){
+  const c = document.getElementById('content');
+  const isStaffOnUsers = (m.id==='staffUsers' && currentUser.type!=='master');
+  let html = '<div class="moduleBar">';
+  html += '<input class="searchBox" id="searchBox" placeholder="Search '+esc(m.label.toLowerCase())+'..." oninput="renderTable()">';
+  if(!isStaffOnUsers){
+    html += '<button class="iconBtn" onclick="openModal(\''+m.id+'\')">＋ Add new</button>';
+  }
+  html += '<button class="iconBtn" onclick="exportModulePDF(\''+m.id+'\')">⬇ PDF</button>';
+  html += '<button class="iconBtn" onclick="exportModuleExcel(\''+m.id+'\')">⬇ Excel</button>';
+  html += '</div><div class="tableWrap"><table><thead><tr id="tableHeadRow"></tr></thead><tbody id="tableBody"></tbody></table></div>';
+  c.innerHTML = html;
+  renderTable();
+}
+function currentFiltered(){
+  const m = getModule(currentModuleId);
+  const q = (document.getElementById('searchBox') && document.getElementById('searchBox').value || '').toLowerCase();
+  let rows = getRecords(m.id).slice().sort((a,b)=>(b._createdAt||0)-(a._createdAt||0));
+  if(q){
+    rows = rows.filter(r => m.fields.some(fd => String(r[fd.key]||'').toLowerCase().includes(q)));
+  }
+  return {m, rows};
+}
+function renderTable(){
+  const {m, rows} = currentFiltered();
+  const head = document.getElementById('tableHeadRow');
+  const body = document.getElementById('tableBody');
+  const cols = m.cols;
+  const SYNTHETIC_LABELS = {progress:'Progress', steps:'Steps'};
+  head.innerHTML = cols.map(k=>{
+    const fd = m.fields.find(x=>x.key===k);
+    return '<th>'+esc(fd?fd.label:(SYNTHETIC_LABELS[k]||k))+'</th>';
+  }).join('') + '<th></th>';
+  if(rows.length===0){
+    body.innerHTML = '<tr><td colspan="'+(cols.length+1)+'"><div class="emptyState">No records yet — add the first one to get started.</div></td></tr>';
+    return;
+  }
+  const canManage = !(m.id==='staffUsers' && currentUser.type!=='master');
+  const canDelete = currentUser.type==='master';
+  body.innerHTML = rows.map(r=>{
+    let tds = cols.map(k=>{
+      const fd = m.fields.find(x=>x.key===k);
+      if(!fd){
+        if(k==='progress'){ let items=[]; try{items=JSON.parse(r.items||'[]');}catch(e){} const done=items.filter(i=>i.done).length; return '<td>'+done+'/'+items.length+'</td>'; }
+        if(k==='steps'){ let steps=[]; try{steps=JSON.parse(r.steps||'[]');}catch(e){} return '<td>'+steps.length+' step'+(steps.length===1?'':'s')+'</td>'; }
+        return '<td>—</td>';
+      }
+      let v = r[k];
+      if(fd.type==='select' && v){ return '<td><span class="badge '+statusBadgeClass(v)+'">'+esc(v)+'</span></td>'; }
+      if(fd.type==='checkbox'){ return '<td>'+(v?'Yes':'No')+'</td>'; }
+      return '<td>'+esc(v||'—')+'</td>';
+    }).join('');
+    let actions = '<div class="rowActions">';
+    if(canManage) actions += '<button class="miniBtn" onclick="event.stopPropagation(); openModal(\''+m.id+'\',\''+r._id+'\')">Edit</button>';
+    if(canManage && canDelete) actions += '<button class="miniBtn del" onclick="event.stopPropagation(); confirmDelete(\''+m.id+'\',\''+r._id+'\')">Delete</button>';
+    actions += '</div>';
+    const rowClick = canManage ? "onclick=\"openModal('"+m.id+"','"+r._id+"')\"" : '';
+    return '<tr '+rowClick+'>'+tds+'<td>'+actions+'</td></tr>';
+  }).join('');
+}
+
+/* ---- modal add/edit ---- */
+let modalCtx = {moduleId:null, recordId:null};
+function openModal(moduleId, recordId){
+  const m = getModule(moduleId);
+  modalCtx = {moduleId, recordId: recordId||null};
+  document.getElementById('modalTitle').textContent = (recordId? 'Edit ':'Add ') + m.label.replace(/s$/,'').toLowerCase().replace(/^./,c=>c.toUpperCase());
+  let rec = {};
+  if(recordId){ rec = getRecords(moduleId).find(r=>r._id===recordId) || {}; }
+  let html='';
+  m.fields.forEach(fd=>{
+    html += '<div class="field">';
+    if(fd.type!=='checkbox') html += '<label>'+esc(fd.label)+(fd.required?' *':'')+'</label>';
+    if(fd.type==='textarea'){
+      html += '<textarea id="fld_'+fd.key+'" rows="3">'+esc(rec[fd.key]||'')+'</textarea>';
+    } else if(fd.type==='select'){
+      html += '<select id="fld_'+fd.key+'">' + '<option value="">Select…</option>' + fd.options.map(o=>'<option value="'+esc(o)+'" '+(rec[fd.key]===o?'selected':'')+'>'+esc(o)+'</option>').join('') + '</select>';
+    } else if(fd.type==='checkbox'){
+      html += '<div class="checkField"><input type="checkbox" id="fld_'+fd.key+'" '+(rec[fd.key]?'checked':'')+'><label style="margin:0;">'+esc(fd.label)+'</label></div>';
+    } else if(fd.type==='photo'){
+      html += '<input type="hidden" id="fld_'+fd.key+'" value="'+esc(rec[fd.key]||'')+'">';
+      html += '<input type="file" accept="image/*" onchange="handlePhotoSelect(this,\''+fd.key+'\')">';
+      html += '<div id="preview_'+fd.key+'" style="margin-top:8px;">'+(rec[fd.key]?'<img src="'+rec[fd.key]+'" style="max-width:160px;border-radius:4px;display:block;">':'')+'</div>';
+    } else {
+      html += '<input type="'+fd.type+'" id="fld_'+fd.key+'" value="'+esc(rec[fd.key]||'')+'">';
+    }
+    html += '</div>';
+  });
+  if(moduleId==='checklists'){
+    try{ checklistDraft = rec.items ? JSON.parse(rec.items) : []; }catch(e){ checklistDraft = []; }
+    html += '<div class="field"><label>Checklist items</label><div id="checklistItemsList"></div>';
+    html += '<div style="display:flex;gap:8px;margin-top:8px;"><input id="newChecklistItem" placeholder="Add an item…" style="flex:1;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);color:var(--ink);" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addChecklistItem();}">';
+    html += '<button type="button" class="btnGhost" onclick="addChecklistItem()">Add</button></div>';
+    html += '<button type="button" class="btnGhost" style="margin-top:8px;" onclick="loadDefaultChecklist()">Load default HSE checklist</button></div>';
+  }
+  if(moduleId==='jobHazardAnalysis'){
+    try{ jhaStepsDraft = rec.steps ? JSON.parse(rec.steps) : []; }catch(e){ jhaStepsDraft = []; }
+    html += '<div class="field"><label>Job steps, hazards &amp; controls</label><div id="jhaStepsList"></div>';
+    html += '<button type="button" class="btnGhost" style="margin-top:8px;" onclick="addJhaStep()">+ Add step</button></div>';
+  }
+  document.getElementById('modalBody').innerHTML = html;
+  if(moduleId==='checklists') renderChecklistItemsList();
+  if(moduleId==='jobHazardAnalysis') renderJhaStepsList();
+  document.getElementById('modalWrap').classList.add('show');
+}
+
+/* ---- photo capture ---- */
+function handlePhotoSelect(input, key){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      const maxW = 640;
+      const scale = Math.min(1, maxW/img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width*scale; canvas.height = img.height*scale;
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      document.getElementById('fld_'+key).value = dataUrl;
+      document.getElementById('preview_'+key).innerHTML = '<img src="'+dataUrl+'" style="max-width:160px;border-radius:4px;display:block;">';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ---- checklist items editor ---- */
+let checklistDraft = [];
+const DEFAULT_CHECKLIST_ITEMS = [
+  'PPE issued and worn correctly for the task','Fire extinguishers in place, inspected and accessible',
+  'Emergency exits and evacuation routes clear and signed','First aid kit stocked and accessible',
+  'Spill kits available near chemical storage/handling areas','Hazardous materials properly labelled and stored (SDS available)',
+  'Machine guards and safety devices in place and functioning','Housekeeping: walkways, aisles and work areas clear of clutter',
+  'Electrical cords, panels and outlets undamaged and unobstructed','Warning signs and safety signage visible and in good condition',
+  'Permits to work displayed for hot work / confined space / height work','Vehicles and mobile equipment inspected before use',
+  'Visitor sign-in log in use and up to date','Incident/accident report register available',
+  'Staff training and certifications current','Ladders and scaffolding inspected and tagged',
+  'Hearing protection available in high-noise areas','Eyewash stations and emergency showers accessible',
+  'Waste segregated and disposed of correctly','Emergency contact numbers posted and visible',
+  'CCTV and security systems operational','Access control points secured and functioning'
+];
+function renderChecklistItemsList(){
+  const el = document.getElementById('checklistItemsList'); if(!el) return;
+  if(checklistDraft.length===0){ el.innerHTML = '<div style="color:var(--ink-soft);font-size:12.5px;">No items yet — add one above or load the default checklist.</div>'; return; }
+  el.innerHTML = checklistDraft.map((it,idx)=>
+    '<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--line);">'+
+    '<input type="checkbox" '+(it.done?'checked':'')+' onchange="toggleChecklistItem('+idx+')">'+
+    '<span style="flex:1;font-size:13px;'+(it.done?'color:var(--ink-soft);text-decoration:line-through;':'')+'">'+esc(it.text)+'</span>'+
+    '<button type="button" class="miniBtn del" onclick="removeChecklistItem('+idx+')">Remove</button></div>'
+  ).join('');
+}
+function addChecklistItem(){
+  const inp = document.getElementById('newChecklistItem');
+  const v = inp.value.trim(); if(!v) return;
+  checklistDraft.push({text:v, done:false}); inp.value='';
+  renderChecklistItemsList();
+}
+function toggleChecklistItem(idx){ checklistDraft[idx].done = !checklistDraft[idx].done; renderChecklistItemsList(); }
+function removeChecklistItem(idx){ checklistDraft.splice(idx,1); renderChecklistItemsList(); }
+function loadDefaultChecklist(){
+  DEFAULT_CHECKLIST_ITEMS.forEach(t=>{ if(!checklistDraft.find(i=>i.text===t)) checklistDraft.push({text:t, done:false}); });
+  renderChecklistItemsList();
+}
+
+/* ---- JHA / JSA steps editor ---- */
+let jhaStepsDraft = [];
+function renderJhaStepsList(){
+  const el = document.getElementById('jhaStepsList'); if(!el) return;
+  if(jhaStepsDraft.length===0){ el.innerHTML = '<div style="color:var(--ink-soft);font-size:12.5px;">No steps yet — add the first job step.</div>'; return; }
+  el.innerHTML = jhaStepsDraft.map((s,idx)=>
+    '<div style="border:1px solid var(--line);border-radius:var(--radius);padding:10px;margin-bottom:8px;">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b style="font-size:12.5px;">Step '+(idx+1)+'</b>'+
+    '<button type="button" class="miniBtn del" onclick="removeJhaStep('+idx+')">Remove</button></div>'+
+    '<input placeholder="Step description" value="'+esc(s.step||'')+'" style="width:100%;margin-bottom:6px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);color:var(--ink);" oninput="jhaStepsDraft['+idx+'].step=this.value">'+
+    '<input placeholder="Hazard(s)" value="'+esc(s.hazard||'')+'" style="width:100%;margin-bottom:6px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);color:var(--ink);" oninput="jhaStepsDraft['+idx+'].hazard=this.value">'+
+    '<input placeholder="Control measure(s)" value="'+esc(s.control||'')+'" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);color:var(--ink);" oninput="jhaStepsDraft['+idx+'].control=this.value">'+
+    '</div>'
+  ).join('');
+}
+function addJhaStep(){ jhaStepsDraft.push({step:'',hazard:'',control:''}); renderJhaStepsList(); }
+function removeJhaStep(idx){ jhaStepsDraft.splice(idx,1); renderJhaStepsList(); }
+function closeModal(){ document.getElementById('modalWrap').classList.remove('show'); }
+function saveModal(){
+  const m = getModule(modalCtx.moduleId);
+  let missing=false;
+  const rec = {};
+  m.fields.forEach(fd=>{
+    const el = document.getElementById('fld_'+fd.key);
+    if(!el) return;
+    const v = fd.type==='checkbox' ? el.checked : el.value.trim();
+    if(fd.required && !v){ missing=true; el.style.borderColor='var(--danger)'; }
+    else if(el.style) el.style.borderColor='';
+    rec[fd.key] = v;
+  });
+  if(missing){ return; }
+  if(m.id==='checklists') rec.items = JSON.stringify(checklistDraft);
+  if(m.id==='jobHazardAnalysis') rec.steps = JSON.stringify(jhaStepsDraft);
+  let rows = getRecords(m.id);
+  if(modalCtx.recordId){
+    rows = rows.map(r=> r._id===modalCtx.recordId ? Object.assign({}, r, rec) : r);
+  } else {
+    rec._id = uid(); rec._createdAt = Date.now();
+    rows.push(rec);
+  }
+  setRecords(m.id, rows);
+  closeModal();
+  if(m.id==='dashboard') renderDashboard(); else renderTable();
+  if(currentModuleId==='dashboard') renderDashboard();
+}
+function confirmDelete(moduleId, recordId){
+  document.getElementById('confirmMsg').textContent = 'Delete this record? This cannot be undone.';
+  const btn = document.getElementById('confirmDoBtn');
+  btn.onclick = ()=>{
+    let rows = getRecords(moduleId).filter(r=>r._id!==recordId);
+    setRecords(moduleId, rows);
+    closeConfirm();
+    renderTable();
+  };
+  document.getElementById('confirmWrap').classList.add('show');
+}
+function closeConfirm(){ document.getElementById('confirmWrap').classList.remove('show'); }
+
+/* ========================================================================
+   EXPORTS
+   ======================================================================== */
+function moduleExportData(moduleId){
+  const m = getModule(moduleId);
+  const rows = getRecords(moduleId);
+  const exportFields = m.fields.filter(fd=>fd.type!=='photo');
+  let headers = exportFields.map(fd=>fd.label);
+  if(moduleId==='checklists') headers = headers.concat(['Checklist items']);
+  if(moduleId==='jobHazardAnalysis') headers = headers.concat(['Steps / hazards / controls']);
+  const body = rows.map(r=>{
+    let row = exportFields.map(fd=> fd.type==='checkbox' ? (r[fd.key]?'Yes':'No') : (r[fd.key]||''));
+    if(moduleId==='checklists'){
+      let items=[]; try{items=JSON.parse(r.items||'[]');}catch(e){}
+      row.push(items.map(i=>(i.done?'[x] ':'[ ] ')+i.text).join(' | '));
+    }
+    if(moduleId==='jobHazardAnalysis'){
+      let steps=[]; try{steps=JSON.parse(r.steps||'[]');}catch(e){}
+      row.push(steps.map((s,idx)=>(idx+1)+'. '+(s.step||'')+' — Hazard: '+(s.hazard||'')+' — Control: '+(s.control||'')).join(' | '));
+    }
+    return row;
+  });
+  return {m, headers, body};
+}
+function exportModulePDF(moduleId){
+  const {m, headers, body} = moduleExportData(moduleId);
+  if(body.length===0){ flashTopMsg('Nothing to export yet in '+m.label+'.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:'landscape'});
+  const logo = getLogo();
+  let textX = 14, startY = 26;
+  if(logo){
+    try{ doc.addImage(logo, 14, 8, 16, 16); textX = 34; }catch(e){}
+  }
+  doc.setFontSize(14); doc.text('SafeHSE Ops — '+m.label, textX, 16);
+  doc.setFontSize(9); doc.text('Generated '+new Date().toLocaleString(), textX, 22);
+  doc.autoTable({ head:[headers], body, startY, styles:{fontSize:7, cellPadding:2}, headStyles:{fillColor:[28,31,38]} });
+  doc.save('SafeHSEOps_'+m.id+'_'+todayStr()+'.pdf');
+}
+function exportModuleExcel(moduleId){
+  const {m, headers, body} = moduleExportData(moduleId);
+  if(body.length===0){ flashTopMsg('Nothing to export yet in '+m.label+'.'); return; }
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...body]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, m.label.slice(0,31));
+  XLSX.writeFile(wb, 'SafeHSEOps_'+m.id+'_'+todayStr()+'.xlsx');
+}
+function exportAllExcel(){
+  const wb = XLSX.utils.book_new();
+  let any=false;
+  MODULES.forEach(m=>{
+    if(m.special) return;
+    const {headers, body} = moduleExportData(m.id);
+    if(body.length===0) return;
+    any=true;
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...body]);
+    XLSX.utils.book_append_sheet(wb, ws, m.label.slice(0,31));
+  });
+  if(!any){ flashTopMsg('No records anywhere yet to export.'); return; }
+  XLSX.writeFile(wb, 'SafeHSEOps_FullExport_'+todayStr()+'.xlsx');
+}
+function fullBackupJSON(){
+  const backup = { data: loadData(), settings: loadSettings(), exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'SafeHSEOps_Backup_'+todayStr()+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function restoreBackupFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const parsed = JSON.parse(e.target.result);
+      if(parsed.data) saveData(parsed.data);
+      if(parsed.settings) saveSettings(parsed.settings);
+      flashTopMsg('Backup restored successfully.');
+      navigateTo('dashboard');
+    }catch(err){ flashTopMsg('Could not read that backup file.'); }
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+function flashTopMsg(msg){
+  const t = document.getElementById('topTitle');
+  const old = t.innerHTML;
+  t.innerHTML = '<span style="color:var(--accent);">'+esc(msg)+'</span>';
+  setTimeout(()=>{ t.innerHTML = old; }, 2600);
+}
+
+/* ========================================================================
+   REPORTS PAGE
+   ======================================================================== */
+function renderReports(){
+  const c = document.getElementById('content');
+  const opts = MODULES.filter(m=>!m.special).map(m=>'<option value="'+m.id+'">'+esc(m.label)+'</option>').join('');
+  let html = '<div class="panel"><h3>Export a single module</h3>';
+  html += '<div class="reportRow"><select id="reportModuleSel">'+opts+'</select>';
+  html += '<button class="iconBtn" onclick="exportModulePDF(document.getElementById(\'reportModuleSel\').value)">⬇ PDF</button>';
+  html += '<button class="iconBtn" onclick="exportModuleExcel(document.getElementById(\'reportModuleSel\').value)">⬇ Excel</button></div>';
+  html += '</div>';
+  html += '<div class="panel"><h3>Export everything</h3>';
+  html += '<div class="reportRow"><span style="flex:1;color:var(--ink-soft);font-size:13px;">One Excel workbook, one sheet per module with data</span><button class="iconBtn" onclick="exportAllExcel()">⬇ Excel (all modules)</button></div>';
+  html += '<div class="reportRow"><span style="flex:1;color:var(--ink-soft);font-size:13px;">Full raw backup, restorable from Settings</span><button class="iconBtn" onclick="fullBackupJSON()">⬇ JSON backup</button></div>';
+  html += '</div>';
+  c.innerHTML = html;
+}
+
+/* ========================================================================
+   SETTINGS PAGE (master only)
+   ======================================================================== */
+function renderSettings(){
+  const c = document.getElementById('content');
+  if(currentUser.type!=='master'){ c.innerHTML = '<div class="emptyState">Settings are restricted to Master (CSI / MD / M).</div>'; return; }
+  const logo = getLogo();
+  let html = '<div class="panel"><h3>Company logo</h3>';
+  html += '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">';
+  html += '<div id="logoPreviewBox" style="width:64px;height:64px;border:1px solid var(--line);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--paper);">'+(logo?'<img src="'+logo+'" style="max-width:100%;max-height:100%;">':'<span style="color:var(--ink-soft);font-size:11px;">No logo</span>')+'</div>';
+  html += '<div style="flex:1;min-width:200px;"><input type="file" accept="image/*" onchange="handleLogoUpload(this)"><p class="loginNote" style="margin-top:6px;">Shown on the login screen, sidebar and PDF exports.</p></div>';
+  if(logo) html += '<button class="btnGhost" onclick="handleRemoveLogo()">Remove logo</button>';
+  html += '</div></div>';
+  html += '<div class="panel"><h3>App link</h3>';
+  html += '<div class="reportRow"><input readonly value="'+esc(getAppLink())+'" style="flex:1;min-width:200px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);color:var(--ink);" onclick="this.select()"><button class="iconBtn" onclick="copyAppLink()">Copy link</button></div>';
+  html += '<p class="loginNote">Share this link with staff so they can open SafeHSE Ops on their own phone, tablet or computer. It stays private until you choose to share it. On Android or desktop Chrome, open the link then use the install button (or the browser menu) to add it as an app; on iPhone/iPad use Share → Add to Home Screen.</p>';
+  html += '</div><div class="panel"><h3>Backup &amp; restore</h3>';
+  html += '<div class="reportRow"><span style="flex:1;color:var(--ink-soft);font-size:13px;">Download a full backup of every module\'s data</span><button class="iconBtn" onclick="fullBackupJSON()">⬇ Download backup</button></div>';
+  html += '<div class="reportRow"><span style="flex:1;color:var(--ink-soft);font-size:13px;">Restore from a previously downloaded backup file</span><input type="file" accept="application/json" onchange="restoreBackupFile(this)"></div>';
+  html += '</div>';
+  html += '<div class="panel"><h3>Master passcode</h3>';
+  html += '<div class="field"><label>New master passcode</label><input id="newPasscode" type="password" placeholder="Enter a new passcode"></div>';
+  html += '<button class="btnSolid" onclick="changePasscode()">Update passcode</button>';
+  html += '</div>';
+  c.innerHTML = html;
+}
+function handleLogoUpload(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      const size = 256;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.min(size/img.width, size/img.height);
+      const w = img.width*scale, h = img.height*scale;
+      ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+      const dataUrl = canvas.toDataURL('image/png');
+      setLogo(dataUrl);
+      applyLogo();
+      renderSettings();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function handleRemoveLogo(){ removeLogo(); applyLogo(); renderSettings(); }
+function copyAppLink(){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(getAppLink()).then(()=>flashTopMsg('Link copied.')).catch(()=>flashTopMsg('Could not copy — copy it manually.'));
+  } else { flashTopMsg('Copy it manually from the field.'); }
+}
+function changePasscode(){
+  const v = document.getElementById('newPasscode').value.trim();
+  if(v.length<4){ flashTopMsg('Passcode should be at least 4 characters.'); return; }
+  const s = loadSettings(); s.masterPasscode = v; saveSettings(s);
+  document.getElementById('newPasscode').value='';
+  flashTopMsg('Master passcode updated.');
+}
+
+/* ========================================================================
+   THEME
+   ======================================================================== */
+function toggleTheme(){
+  const root = document.documentElement;
+  const cur = root.getAttribute('data-theme');
+  const next = cur==='dark' ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+  try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+}
+(function initTheme(){
+  try{
+    const saved = localStorage.getItem(THEME_KEY);
+    if(saved) document.documentElement.setAttribute('data-theme', saved);
+  }catch(e){}
+})();
+
+/* ========================================================================
+   COMPANY LOGO — apply to header slots
+   ======================================================================== */
+function applyLogo(){
+  const logo = getLogo();
+  const dot = '<span class="dot"></span>';
+  document.getElementById('loginMark').innerHTML = logo ? '<img src="'+logo+'" style="width:26px;height:26px;border-radius:4px;object-fit:cover;">' : dot;
+  document.getElementById('loginMark').innerHTML += '<h1>SafeHSE Ops</h1>';
+  document.getElementById('sidebarMark').innerHTML = (logo ? '<img src="'+logo+'" style="width:20px;height:20px;border-radius:3px;object-fit:cover;">' : dot) + '<h2>SafeHSE Ops</h2>';
+  if(logo) document.getElementById('appleTouchIcon').setAttribute('href', logo);
+}
+
+/* ========================================================================
+   PWA INSTALL — real manifest.json + service-worker.js, both served
+   alongside this file from your own domain (see README.md)
+   ======================================================================== */
+let deferredInstallPrompt = null;
+function registerSW(){
+  if(!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+}
+function triggerInstall(){
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.finally(()=>{ deferredInstallPrompt = null; document.querySelectorAll('.installTrigger').forEach(b=>b.style.display='none'); });
+  }
+}
+function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream; }
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault(); deferredInstallPrompt = e;
+  document.querySelectorAll('.installTrigger').forEach(b=>b.style.display='inline-flex');
+});
+
+/* ========================================================================
+   INIT
+   ======================================================================== */
+(function init(){
+  loadSettings();
+  registerSW();
+  applyLogo();
+  if(isIOS() && !window.navigator.standalone){
+    document.querySelectorAll('.iosInstallHint').forEach(el=>el.style.display='block');
+  }
+  const appLinkNote = document.getElementById('appLinkNote');
+  if(appLinkNote){ appLinkNote.style.display='block'; appLinkNote.textContent = 'App link: ' + location.href.split('#')[0]; }
+  const s = getSession();
+  if(s){ currentUser = s; enterApp(); }
+})();
+document.addEventListener('keydown', function(e){
+  if(e.key==='Escape'){ closeModal(); closeConfirm(); }
+});
+</script>
+</body>
+</html>
